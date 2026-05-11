@@ -102,9 +102,9 @@ public:
     auto match_result = execute_match(asks, qty, price);
     int64_t leftover = qty - match_result.filled_qty;
     if (leftover > 0) {
-      auto &bidsPriceLevel = bids[price];
-      bidsPriceLevel.push_back({id, price, leftover, Side::Buy});
-      auto iter = std::prev(bidsPriceLevel.end());
+      auto &bids_price_level = bids[price];
+      bids_price_level.push_back({id, price, leftover, Side::Buy});
+      auto iter = std::prev(bids_price_level.end());
       orders_map[id] = iter;
     }
 
@@ -116,9 +116,9 @@ public:
     auto match_result = execute_match(bids, qty, price);
     int64_t leftover = qty - match_result.filled_qty;
     if (leftover > 0) {
-      auto &asksPriceLevel = asks[price];
-      asksPriceLevel.push_back({id, price, leftover, Side::Sell});
-      auto iter = std::prev(asksPriceLevel.end());
+      auto &asks_price_level = asks[price];
+      asks_price_level.push_back({id, price, leftover, Side::Sell});
+      auto iter = std::prev(asks_price_level.end());
       orders_map[id] = iter;
     }
 
@@ -126,17 +126,17 @@ public:
   }
 
   bool cancel_order(int id) {
-    auto orderIter = orders_map.find(id);
-    if (orderIter == orders_map.end()) {
+    auto order_it = orders_map.find(id);
+    if (order_it == orders_map.end()) {
       return false;
     }
 
-    auto listIter = orderIter->second;
-    if (listIter->side == Side::Buy) {
-      return cancel_in(bids, listIter->price, orderIter, listIter);
+    auto list_it = order_it->second;
+    if (list_it->side == Side::Buy) {
+      return cancel_in(bids, list_it->price, order_it, list_it);
     }
 
-    return cancel_in(asks, listIter->price, orderIter, listIter);
+    return cancel_in(asks, list_it->price, order_it, list_it);
   }
 
   MatchResult execute_market_sell(int64_t qty) {
@@ -166,19 +166,19 @@ private:
   template <typename MapType>
   bool cancel_in(
       MapType &book, Price price_level,
-      std::unordered_map<int, std::list<Order>::iterator>::iterator orderIter,
-      std::list<Order>::iterator listIter) {
-    auto priceLevelIter = book.find(price_level);
-    if (priceLevelIter == book.end()) {
-      orders_map.erase(orderIter);
+      std::unordered_map<int, std::list<Order>::iterator>::iterator order_it,
+      std::list<Order>::iterator list_it) {
+    auto price_level_it = book.find(price_level);
+    if (price_level_it == book.end()) {
+      orders_map.erase(order_it);
       return false;
     }
 
-    priceLevelIter->second.erase(listIter);
-    orders_map.erase(orderIter);
+    price_level_it->second.erase(list_it);
+    orders_map.erase(order_it);
 
-    if (priceLevelIter->second.empty()) {
-      book.erase(priceLevelIter);
+    if (price_level_it->second.empty()) {
+      book.erase(price_level_it);
     }
 
     return true;
@@ -209,9 +209,9 @@ private:
     int64_t filled_qty = 0;
 
     while (!book.empty() && qty > 0 && passes_limit(book, limit)) {
-      auto currentLevel = book.begin();
-      for (auto it = currentLevel->second.begin();
-           it != currentLevel->second.end();) {
+      auto current_level = book.begin();
+      for (auto it = current_level->second.begin();
+           it != current_level->second.end();) {
         if (it->qty <= qty) {
           filled_qty += it->qty;
           qty -= it->qty;
@@ -219,7 +219,7 @@ private:
           notional_ticks += it->qty * it->price.ticks;
 
           orders_map.erase(it->id);
-          it = currentLevel->second.erase(it);
+          it = current_level->second.erase(it);
         } else {
           it->qty -= qty;
           filled_qty += qty;
@@ -231,8 +231,8 @@ private:
         }
       }
 
-      if (currentLevel->second.empty()) {
-        book.erase(currentLevel);
+      if (current_level->second.empty()) {
+        book.erase(current_level);
       }
     }
 
